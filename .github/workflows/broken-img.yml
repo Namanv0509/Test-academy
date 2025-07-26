@@ -47,35 +47,41 @@ jobs:
           for file in "${md_files[@]}"; do
             echo "Checking images in $file"
             
-            # Extract image references from markdown with stricter regex
-            images=$(grep -oE '!\[[^\]]*]\([^)]+\.\w+\)' "$file" | sed -E 's/!\[[^\]]*]\(([^)]+)\)/\1/g' || true)
+            # Extract image references with line numbers
+            images=$(grep -nE '!\[[^\]]*]\([^)]+\)' "$file" | sed -E 's/([0-9]+):!\[[^\]]*]\(([^)]+)\)/\1:\2/g' || true)
             
             if [[ -z "$images" ]]; then
               echo "No image references found in $file"
               continue
             fi
             
-            echo "Found image references: $images"
+            echo "Found image references:"
+            echo "$images"
             
-            while IFS= read -r image; do
+            while IFS=: read -r line_num image_path; do
               # Clean the image path
-              image_path=$(echo "$image" | sed 's/[[:space:]]*$//')
+              image_path=$(echo "$image_path" | sed 's/[[:space:]]*$//')
               
-              # Check if image path is empty or invalid
+              # Check if image path is empty
               if [[ -z "$image_path" ]]; then
-                echo "::warning file=$file::Empty image reference found"
-                error_messages+=("Empty image reference in $file")
+                echo "::warning file=$file,line=$line_num::Empty image reference found"
+                error_messages+=("Empty image reference in $file at line $line_num")
                 exit_code=1
                 continue
               fi
               
-              # Get the file extension
-              extension=$(echo "$image_path" | grep -oE '\.[a-zA-Z0-9]+$' | tr '[:upper:]' '[:lower:]')
+              # Get the file extension (if any)
+              extension=$(echo "$image_path" | grep -oE '\.[a-zA-Z0-9]+$' | tr '[:upper:]' '[:lower:]' || true)
               
-              # Check if extension is valid
-              if [[ ! "$extension" =~ \.($VALID_EXTENSIONS)$ ]]; then
-                echo "::warning file=$file::Invalid image extension in $image_path. Valid extensions are: $VALID_EXTENSIONS"
-                error_messages+=("Invalid image extension ($image_path) in $file")
+              # Check if extension exists and is valid
+              if [[ -z "$extension" ]]; then
+                echo "::warning file=$file,line=$line_num::No file extension in image reference: $image_path"
+                error_messages+=("No file extension ($image_path) in $file at line $line_num")
+                exit_code=1
+                continue
+              elif [[ ! "$extension" =~ \.($VALID_EXTENSIONS)$ ]]; then
+                echo "::warning file=$file,line=$line_num::Invalid image extension in $image_path. Valid extensions are: $VALID_EXTENSIONS"
+                error_messages+=("Invalid image extension ($image_path) in $file at line $line_num")
                 exit_code=1
                 continue
               fi
@@ -89,8 +95,8 @@ jobs:
               
               # Check if image file exists
               if [[ ! -f "$full_path" ]]; then
-                echo "::warning file=$file::Image not found: $image_path"
-                error_messages+=("Image not found ($image_path) in $file")
+                echo "::warning file=$file,line=$line_num::Image not found: $image_path"
+                error_messages+=("Image not found ($image_path) in $file at line $line_num")
                 exit_code=1
               fi
             done <<< "$images"
