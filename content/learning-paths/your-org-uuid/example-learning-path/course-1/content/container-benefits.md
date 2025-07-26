@@ -9,19 +9,13 @@ weight: 3
 ---
 
 
-
-![image](image-1.png)
-
-
 ### **Container Benefits**
 
 1. **dev and ops separation of concerns** create application container images at build/release time rather than deployment time, thereby decoupling applications from infrastructure
 
-![image]({{< usestatic "image-1.png" >}})
 
 2. **continuous development, integration, and deployment** provides for reliable and frequent container image build and deployment with quick and efficient rollbacks – due to image immutability
 
-![image]({{< usestatic "image-1.png" >}})
 
 3. **environmental consistency across dev, test, and prod** runs the same on a laptop as it does on an on-premises server, virtualized server, and in the cloud
 
