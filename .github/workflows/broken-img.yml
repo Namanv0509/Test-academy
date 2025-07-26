@@ -50,9 +50,14 @@ jobs:
               done
             else
               echo "::warning::File $file not found"
+              has_invalid_images=true
             fi
           done
           
-          if [ "$has_invalid_images" = false ]; then
+          # Exit with error code if invalid images were found
+          if [ "$has_invalid_images" = true ]; then
+            echo "Validation failed: Found invalid image formats in Markdown files"
+            exit 1
+          else
             echo "All image formats are valid"
           fi
