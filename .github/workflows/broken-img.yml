@@ -8,6 +8,9 @@ on:
       - 'content/**.md'
       - 'content/**.markdown'
       - 'static/images/**'
+permissions:
+  pull-requests: write
+  issues: write
 
 jobs:
   validate-images:
@@ -30,7 +33,6 @@ jobs:
 
       - name: Check image references
         run: |
-          #!/bin/bash
           set -e
           
           # Valid image extensions
@@ -56,7 +58,7 @@ jobs:
                 echo "::warning file=$file::Empty image reference found"
                 exit_code=1
                 continue
-              }
+              fi
               
               # Get the file extension
               extension=$(echo "$image_path" | grep -oE '\.[a-zA-Z0-9]+$' | tr '[:upper:]' '[:lower:]')
@@ -66,7 +68,7 @@ jobs:
                 echo "::warning file=$file::Invalid image extension in $image_path. Valid extensions are: $VALID_EXTENSIONS"
                 exit_code=1
                 continue
-              }
+              fi
               
               # Convert relative path to absolute (assuming images are in static/images)
               if [[ "$image_path" =~ ^/ ]]; then
@@ -96,7 +98,7 @@ jobs:
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
-            const result = context.job.status === 'success' ? 'success' : 'failure';
+            const result = '${{ job.status }}';
             const message = result === 'success' 
               ? '✅ All image references in markdown files are valid!'
               : '❌ Image validation failed. Check the workflow logs for details.';
