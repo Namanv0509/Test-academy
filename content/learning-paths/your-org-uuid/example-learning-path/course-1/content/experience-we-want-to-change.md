@@ -12,7 +12,7 @@ weight: 1
 
 Many people have a complex job building, testing, and running systems based on old concepts and technology in today's IT — the results you can see below (Experiences we want to change!). Modern ways to build, test, and run IT systems are not adopted as broadly as possible. Hence, a lot of pain is still out there that we could ease by changing IT processes and utilizing the new ways.
 
-![image]({{< usestatic "image-1.png" >}})
+![image](image-1.png123
 
 ### **Experiences we want to change!**
 
