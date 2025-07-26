@@ -43,12 +43,13 @@ jobs:
           
           exit_code=0
           error_messages=()
+          valid_images=()
           
           for file in "${md_files[@]}"; do
             echo "Checking images in $file"
             
-            # Extract image references with line numbers
-            images=$(grep -nE '!\[[^\]]*]\([^)]+\)' "$file" | sed -E 's/([0-9]+):!\[[^\]]*]\(([^)]+)\)/\1:\2/g' || true)
+            # Extract all image references, including empty ones, with line numbers
+            images=$(grep -nE '!\[[^\]]*]\([[:space:]]*[^\)]*\)' "$file" || true)
             
             if [[ -z "$images" ]]; then
               echo "No image references found in $file"
@@ -58,14 +59,15 @@ jobs:
             echo "Found image references:"
             echo "$images"
             
-            while IFS=: read -r line_num image_path; do
-              # Clean the image path
-              image_path=$(echo "$image_path" | sed 's/[[:space:]]*$//')
+            while IFS=: read -r line_num image_ref; do
+              # Extract the image path from the full reference (e.g., ![alt](path))
+              image_path=$(echo "$image_ref" | sed -E 's/.*\[[^\]]*]\(([[:space:]]*[^\)]*)\)/\1/' | sed 's/[[:space:]]*$//')
+              full_ref=$(echo fit"$image_ref" | sed -E 's/^[0-9]+:(.*)$/\1/')
               
-              # Check if image path is empty
-              if [[ -z "$image_path" ]]; then
-                echo "::warning file=$file,line=$line_num::Empty image reference found"
-                error_messages+=("Empty image reference in $file at line $line_num")
+              # Check if image path is empty or whitespace-only
+              if [[ -z "$image_path" || "$image_path" =~ ^[[:space:]]*$ ]]; then
+                echo "::warning file=$file,line=$line_num::Empty or whitespace-only image reference found: $full_ref"
+                error_messages+=("Empty or whitespace-only image reference ($full_ref) in $file at line $line_num")
                 exit_code=1
                 continue
               fi
@@ -98,17 +100,29 @@ jobs:
                 echo "::warning file=$file,line=$line_num::Image not found: $image_path"
                 error_messages+=("Image not found ($image_path) in $file at line $line_num")
                 exit_code=1
+              else
+                valid_images+=("Valid image ($image_path) in $file at line $line_num")
               fi
             done <<< "$images"
           done
           
+          # Write summary
+          {
+            if [[ ${#error_messages[@]} -gt 0 ]]; then
+              echo "Image validation failed with the following issues:"
+              printf '%s\n' "${error_messages[@]}"
+            else
+              echo "All image references are valid!"
+            fi
+            if [[ ${#valid_images[@]} -gt 0 ]]; then
+              echo -e "\nValid image references:"
+              printf '%s\n' "${valid_images[@]}"
+            fi
+          } > error_summary.txt
+          
           if [[ $exit_code -ne 0 ]]; then
             echo "::error::Image validation failed. Please check the warnings above."
-            printf '%s\n' "${error_messages[@]}" > error_summary.txt
             exit 1
-          else
-            echo "All image references are valid!"
-            echo "No issues found." > error_summary.txt
           fi
 
       - name: Upload error summary
@@ -133,8 +147,8 @@ jobs:
               : '❌ Image validation failed:\n\n';
             
             if (fs.existsSync(summaryFile)) {
-              const errors = fs.readFileSync(summaryFile, 'utf8').trim();
-              message += errors ? `\`\`\`\n${errors}\n\`\`\`` : 'No issues found.';
+              const summary = fs.readFileSync(summaryFile, 'utf8').trim();
+              message += `\`\`\`\n${summary}\n\`\`\``;
             } else {
               message += 'No error summary available.';
             }
