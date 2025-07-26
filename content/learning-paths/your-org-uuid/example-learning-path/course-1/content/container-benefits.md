@@ -10,7 +10,7 @@ weight: 3
 
 
 
-![image]({{< usestatic "image-1.png" >}})
+![image](image-1.pn)
 
 
 ### **Container Benefits**
