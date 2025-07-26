@@ -76,29 +76,6 @@ jobs:
                 continue
               fi
               
-              # Get file extension
-              extension=$(echo "$image_path" | grep -oE '\.[a-zA-Z0-9]+$' | tr '[:upper:]' '[:lower:]' || true)
-              
-              # Validate extension
-              if [[ -z "$extension" ]]; then
-                echo "::error file=$file,line=$line_num"
-                error_messages+=("No file extension ($image_path) in $file")
-                exit_code=1
-                continue
-              elif [[ ! "$extension" =~ \.($VALID_EXTENSIONS)$ ]]; then
-                echo "::error file=$file,line=$line_num::Invalid image extension in $image_path. Valid extensions are: $VALID_EXTENSIONS"
-                error_messages+=("Invalid image extension ($image_path) in $file at line $line_num")
-                exit_code=1
-                continue
-              fi
-              
-              # Convert relative path to absolute
-              if [[ "$image_path" =~ ^/ ]]; then
-                full_path="static${image_path}"
-              else
-                full_path="static/images/${image_path}"
-              fi
-              
               # Check if image exists
               if [[ ! -f "$full_path" ]]; then
                 echo "::error file=$file,line=$line_num::Image not found: $image_path"
