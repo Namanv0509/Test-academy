@@ -1,162 +1,22 @@
-name: Hugo Image Validation
+name: Read Markdown Last Line
+
 on:
   pull_request:
-    branches:
-      - main
-      - master
-    paths:
-      - 'content/**.md'
-      - 'content/**.markdown'
-      - 'static/images/**'
-permissions:
-  pull-requests: write
-  issues: write
+    types: [opened, synchronize, reopened]
 
 jobs:
-  validate-images:
-    runs-on: ubuntu-24.04
-    env:
-      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      PR_NUMBER: ${{ github.event.pull_request.number }}
+  read-markdown:
+    runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
-        with:
-          fetch-depth: 1
 
-      - name: Comment starting point
-        uses: hasura/comment-progress@v2.3.0
-        with:
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-          repository: ${{ github.repository }}
-          number: ${{ github.event.pull_request.number }}
-          id: image-validation
-          message: "Starting [Hugo Image Validation](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})..."
-          recreate: true
-          append: false
-
-      - name: Check image references
+      - name: Read last line of markdown file
         run: |
-          set -e
-
-          # Valid image extensions
-          VALID_EXTENSIONS="jpg|jpeg|png|gif|webp|svg"
-          
-          # Find all markdown files
-          md_files=$(find content -type f \( -name "*.md" -o -name "*.markdown" \))
-          
-          exit_code=0
-          error_messages=()
-          valid_images=()
-          
-          for file in $md_files; do
-            echo "Checking images in $file"
-            
-            # Extract image references with line numbers (e.g., ![alt](path))
-            images=$(grep -nE '!\[[^\]]*]\([[:space:]]*[^\)]*\)' "$file" || true)
-            
-            if [[ -z "$images" ]]; then
-              echo "No image found in $file"
-              continue
-            fi
-            
-            echo "Found images:"
-            echo "$images"
-            
-            while IFS=: read -r line_num image_ref; do
-              # Extract image path (trim whitespace)
-              image_path=$(echo "$image_ref" | sed -E 's/.*\[[^\]]*\]\(([[:space:]]*[^\)]*)\).*/\1/' | sed 's/[[:space:]]*$//')
-              full_ref=$(echo "$image_ref" | sed -E 's/^[0-9]+:(.*)$/\1/')
-              
-              # Check for empty or whitespace-only path
-              if [[ -z "$image_path" || "$image_path" =~ ^[[:space:]]*$ ]]; then
-                echo "::error file=$file,line=$line_num::Empty or whitespace-only image found: $full_ref"
-                error_messages+=("Empty or whitespace-only image ($full_ref) in $file at line $line_num")
-                exit_code=1
-                continue
-              fi
-              
-              # Get file extension
-              extension=$(echo "$image_path" | grep -oE '\.[a-zA-Z0-9]+$' | tr '[:upper:]' '[:lower:]' || true)
-              
-              # Validate extension
-              if [[ -z "$extension" ]]; then
-                echo "::error file=$file,line=$line_num"
-                error_messages+=("No file extension ($image_path) in $file")
-                exit_code=1
-                continue
-              elif [[ ! "$extension" =~ \.($VALID_EXTENSIONS)$ ]]; then
-                echo "::error file=$file,line=$line_num::Invalid image extension in $image_path. Valid extensions are: $VALID_EXTENSIONS"
-                error_messages+=("Invalid image extension ($image_path) in $file at line $line_num")
-                exit_code=1
-                continue
-              fi
-              
-              # Convert relative path to absolute
-              if [[ "$image_path" =~ ^/ ]]; then
-                full_path="static${image_path}"
-              else
-                full_path="static/images/${image_path}"
-              fi
-              
-              # Check if image exists
-              if [[ ! -f "$full_path" ]]; then
-                echo "::error file=$file,line=$line_num::Image not found: $image_path"
-                error_messages+=("Image not found ($image_path) in $file at line $line_num")
-                exit_code=1
-              else
-                valid_images+=("Valid image ($image_path) in $file at line $line_num")
-              fi
-            done <<< "$images"
-          done
-          
-          # Write summary
-          {
-            if [[ ${#error_messages[@]} -gt 0 ]]; then
-              echo "Image validation failed with the following issues:"
-              printf '%s\n' "${error_messages[@]}"
-            else
-              echo "All image references are valid!"
-            fi
-            if [[ ${#valid_images[@]} -gt 0 ]]; then
-              echo -e "\nValid image references:"
-              printf '%s\n' "${valid_images[@]}"
-            fi
-          } > error_summary.txt
-          
-          if [[ $exit_code -ne 0 ]]; then
-            echo "::error::Image validation failed. Check warnings above."
+          if [ -f README.md ]; then
+            last_line=$(tail -n 1 README.md)
+            echo "Last line of README.md: $last_line"
+          else
+            echo "README.md not found"
             exit 1
           fi
-
-      - name: Comment success
-        if: success()
-        uses: hasura/comment-progress@v2.3.0
-        with:
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-          repository: ${{ github.repository }}
-          number: ${{ github.event.pull_request.number }}
-          id: image-validation
-          message: ":heavy_check_mark: Hugo Image Validation complete. All image references are valid!"
-          recreate: false
-          append: true
-
-      - name: Comment failure
-        if: failure()
-        uses: hasura/comment-progress@v2.3.0
-        with:
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-          repository: ${{ github.repository }}
-          number: ${{ github.event.pull_request.number }}
-          id: image-validation
-          message: ":x: Hugo Image Validation failed. Check the [workflow logs](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}) for details."
-          recreate: false
-          append: true
-
-      - name: Upload error summary
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: image-validation-summary
-          path: error_summary.txt
-          if-no-files-found: error
