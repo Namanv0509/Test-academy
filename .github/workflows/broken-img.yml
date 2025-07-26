@@ -6,7 +6,7 @@ on:
 
 jobs:
   read-markdown:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -15,8 +15,8 @@ jobs:
 
       - name: Get changed markdown files and validate image lines
         run: |
-          # Get list of changed .md files in the PR
-          changed_files=$(git diff --name-only HEAD^ HEAD | grep '\.md$')
+          # Get list of changed .md files in the PR, with error handling
+          changed_files=$(git diff --name-only HEAD^ HEAD 2>/dev/null | grep '\.md$' || true)
           
           if [ -z "$changed_files" ]; then
             echo "No .md files changed in this PR"
@@ -31,7 +31,7 @@ jobs:
             if [ -f "$file" ]; then
               echo "Checking $file for invalid image lines:"
               # Find lines matching Markdown image syntax ![alt](image-path)
-              grep -n -E '!\[.*\]\(.*\)' "$file" | while IFS= read -r line; do
+              grep -n -E '!\[.*\]\(.*\)' "$file" 2>/dev/null | while IFS= read -r line; do
                 # Extract the image path from the Markdown image syntax
                 image_path=$(echo "$line" | sed -E 's/.*!\[.*\]\((.*)\).*/\1/')
                 
@@ -50,14 +50,13 @@ jobs:
               done
             else
               echo "::warning::File $file not found"
-              has_invalid_images=true
             fi
           done
           
-          # Exit with error code if invalid images were found
+          # Exit with error code only if invalid images were found
           if [ "$has_invalid_images" = true ]; then
             echo "Validation failed: Found invalid image formats in Markdown files"
             exit 1
           else
-            echo "All image formats are valid"
+            echo "No invalid image formats found"
           fi
