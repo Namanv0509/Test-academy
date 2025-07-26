@@ -1,4 +1,4 @@
-name: Read Markdown Last Line
+name: Read Markdown Image Lines
 
 on:
   pull_request:
@@ -13,7 +13,7 @@ jobs:
         with:
           fetch-depth: 2  # Fetch the PR branch and base for diff
 
-      - name: Get changed markdown files and read last line
+      - name: Get changed markdown files and find image lines
         run: |
           # Get list of changed .md files in the PR
           changed_files=$(git diff --name-only HEAD^ HEAD | grep '\.md$')
@@ -26,8 +26,11 @@ jobs:
           # Loop through each changed .md file
           for file in $changed_files; do
             if [ -f "$file" ]; then
-              last_line=$(tail -n 1 "$file")
-              echo "Last line of $file: $last_line"
+              echo "Checking $file for image lines:"
+              # Find lines matching Markdown image syntax ![alt](image-path)
+              grep -E '!\[.*\]\(.*\)' "$file" | while IFS= read -r line; do
+                echo "Found image line: $line"
+              done
             else
               echo "File $file not found"
             fi
