@@ -106,30 +106,6 @@ jobs:
             exit 1
           fi
 
-      - name: Comment success
-        if: success()
-        uses: hasura/comment-progress@v2.3.0
-        with:
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-          repository: ${{ github.repository }}
-          number: ${{ github.event.pull_request.number }}
-          id: image-validation
-          message: ":heavy_check_mark: Hugo Image Validation complete. All image references are valid!"
-          recreate: false
-          append: true
-
-      - name: Comment failure
-        if: failure()
-        uses: hasura/comment-progress@v2.3.0
-        with:
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-          repository: ${{ github.repository }}
-          number: ${{ github.event.pull_request.number }}
-          id: image-validation
-          message: ":x: Hugo Image Validation failed. Check the [workflow logs](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}) for details."
-          recreate: false
-          append: true
-
       - name: Upload error summary
         if: always()
         uses: actions/upload-artifact@v4
