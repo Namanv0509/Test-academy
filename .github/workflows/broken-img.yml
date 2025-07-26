@@ -10,13 +10,25 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 2  # Fetch the PR branch and base for diff
 
-      - name: Read last line of markdown file
+      - name: Get changed markdown files and read last line
         run: |
-          if [ -f README.md ]; then
-            last_line=$(tail -n 1 README.md)
-            echo "Last line of README.md: $last_line"
-          else
-            echo "README.md not found"
-            exit 1
+          # Get list of changed .md files in the PR
+          changed_files=$(git diff --name-only HEAD^ HEAD | grep '\.md$')
+          
+          if [ -z "$changed_files" ]; then
+            echo "No .md files changed in this PR"
+            exit 0
           fi
+          
+          # Loop through each changed .md file
+          for file in $changed_files; do
+            if [ -f "$file" ]; then
+              last_line=$(tail -n 1 "$file")
+              echo "Last line of $file: $last_line"
+            else
+              echo "File $file not found"
+            fi
+          done
