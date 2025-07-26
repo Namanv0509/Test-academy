@@ -10,7 +10,7 @@ weight: 3
 
 
 
-![image](image-1.pngg)
+![image](image-1.pgg)
 
 
 ### **Container Benefits**
