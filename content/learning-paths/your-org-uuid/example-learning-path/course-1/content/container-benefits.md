@@ -13,7 +13,7 @@ weight: 3
 ![image](image-1.png)
 
 
-### **Container Benefits**
+### Container Benefits
 
 1. **dev and ops separation of concerns** create application container images at build/release time rather than deployment time, thereby decoupling applications from infrastructure
 
