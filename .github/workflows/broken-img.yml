@@ -42,20 +42,29 @@ jobs:
           mapfile -t md_files < <(find content -type f \( -name "*.md" -o -name "*.markdown" \))
           
           exit_code=0
+          error_messages=()
           
           for file in "${md_files[@]}"; do
             echo "Checking images in $file"
             
-            # Extract image references from markdown
-            images=$(grep -oE '!\[[^\]]*\]\([^\)]+\)' "$file" | sed -E 's/!\[[^\]]*\]\(([^\)]+)\)/\1/g')
+            # Extract image references from markdown with stricter regex
+            images=$(grep -oE '!\[[^\]]*]\([^)]+\.\w+\)' "$file" | sed -E 's/!\[[^\]]*]\(([^)]+)\)/\1/g' || true)
+            
+            if [[ -z "$images" ]]; then
+              echo "No image references found in $file"
+              continue
+            fi
+            
+            echo "Found image references: $images"
             
             while IFS= read -r image; do
               # Clean the image path
               image_path=$(echo "$image" | sed 's/[[:space:]]*$//')
               
-              # Check if image path is empty
+              # Check if image path is empty or invalid
               if [[ -z "$image_path" ]]; then
                 echo "::warning file=$file::Empty image reference found"
+                error_messages+=("Empty image reference in $file")
                 exit_code=1
                 continue
               fi
@@ -66,6 +75,7 @@ jobs:
               # Check if extension is valid
               if [[ ! "$extension" =~ \.($VALID_EXTENSIONS)$ ]]; then
                 echo "::warning file=$file::Invalid image extension in $image_path. Valid extensions are: $VALID_EXTENSIONS"
+                error_messages+=("Invalid image extension ($image_path) in $file")
                 exit_code=1
                 continue
               fi
@@ -80,6 +90,7 @@ jobs:
               # Check if image file exists
               if [[ ! -f "$full_path" ]]; then
                 echo "::warning file=$file::Image not found: $image_path"
+                error_messages+=("Image not found ($image_path) in $file")
                 exit_code=1
               fi
             done <<< "$images"
@@ -87,10 +98,20 @@ jobs:
           
           if [[ $exit_code -ne 0 ]]; then
             echo "::error::Image validation failed. Please check the warnings above."
+            printf '%s\n' "${error_messages[@]}" > error_summary.txt
             exit 1
           else
             echo "All image references are valid!"
+            echo "No issues found." > error_summary.txt
           fi
+
+      - name: Upload error summary
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: image-validation-summary
+          path: error_summary.txt
+          if-no-files-found: error
 
       - name: Comment on PR
         if: always()
@@ -98,10 +119,21 @@ jobs:
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
+            const fs = require('fs');
             const result = '${{ job.status }}';
-            const message = result === 'success' 
+            const summaryFile = 'error_summary.txt';
+            let message = result === 'success' 
               ? '✅ All image references in markdown files are valid!'
-              : '❌ Image validation failed. Check the workflow logs for details.';
+              : '❌ Image validation failed:\n\n';
+            
+            if (fs.existsSync(summaryFile)) {
+              const errors = fs.readFileSync(summaryFile, 'utf8').trim();
+              message += errors ? `\`\`\`\n${errors}\n\`\`\`` : 'No issues found.';
+            } else {
+              message += 'No error summary available.';
+            }
+            
+            message += '\n\nCheck the [workflow logs](${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}) for details.';
             
             await github.rest.issues.createComment({
               owner: context.repo.owner,
